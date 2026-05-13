@@ -63,17 +63,30 @@ def get_live_price(symbol):
     api_key = os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID")
     secret_key = os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY")
 
+    print("PRICE_LOOKUP_VERSION=IEX_CLIENT_CLEAN_COPY")
+    print(f"RAILWAY_KEY_LOADED={bool(api_key)} KEY_LEN={len(api_key) if api_key else 0} KEY_LAST4={api_key[-4:] if api_key else 'NONE'}")
+    print(f"RAILWAY_SECRET_LOADED={bool(secret_key)} SECRET_LEN={len(secret_key) if secret_key else 0} SECRET_LAST4={secret_key[-4:] if secret_key else 'NONE'}")
+
     if not api_key or not secret_key:
         raise ValueError("Missing Alpaca API credentials for live price lookup")
 
     try:
-        print("PRICE_LOOKUP_VERSION=IEX_CLIENT_FIX")
+        print("PRICE_LOOKUP_VERSION=IEX_CLIENT_CLEAN_COPY")
+
         data_client = StockHistoricalDataClient(api_key, secret_key)
 
         request = StockLatestTradeRequest(
             symbol_or_symbols=symbol,
             feed=DataFeed.IEX
         )
+
+        trades = data_client.get_stock_latest_trade(request)
+        trade = trades[symbol]
+
+        return float(trade.price)
+
+    except Exception as e:
+        raise ValueError(f"Could not get live price for {symbol}: {e}")
 
         trades = data_client.get_stock_latest_trade(request)
         trade = trades[symbol]
