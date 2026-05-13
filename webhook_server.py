@@ -229,8 +229,8 @@ def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
     # Use a wider safety buffer so Alpaca's market-order base_price does not reject the bracket.
     current_price = round(get_live_price(symbol), 2)
 
-    stop_buffer = max(float(AUTO_STOP_DOLLARS), 3.00)
-    target_buffer = max(float(AUTO_TARGET_DOLLARS), 3.00)
+    stop_buffer = max(float(AUTO_STOP_DOLLARS), 10.00)
+    target_buffer = max(float(AUTO_TARGET_DOLLARS), 10.00)
 
     if side == OrderSide.BUY:
         stop_loss = min(float(stop_loss), current_price - stop_buffer)
