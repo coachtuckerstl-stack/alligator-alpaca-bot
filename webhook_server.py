@@ -1,5 +1,6 @@
 import csv
 import os
+import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -9,13 +10,11 @@ from flask import Flask, jsonify, request
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderClass, OrderSide, OrderType, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest, TakeProfitRequest, StopLossRequest
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockLatestTradeRequest
 
 load_dotenv()
 
-ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
-ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
+ALPACA_API_KEY = (os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID") or "").strip()
+ALPACA_SECRET_KEY = (os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY") or "").strip()
 ALPACA_PAPER = os.getenv("ALPACA_PAPER", "true").lower() == "true"
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "coachsq_secret_123")
@@ -40,6 +39,9 @@ EASTERN = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
 
+if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
+    raise ValueError("Missing Alpaca API credentials at startup")
+
 trading_client = TradingClient(
     api_key=ALPACA_API_KEY,
     secret_key=ALPACA_SECRET_KEY,
@@ -54,47 +56,53 @@ def now_et():
 def today():
     return now_et().strftime("%Y-%m-%d")
 
+
 def get_live_price(symbol):
-    import os
-    from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.requests import StockLatestTradeRequest
-    from alpaca.data.enums import DataFeed
+    api_key = (os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID") or "").strip()
+    secret_key = (os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY") or "").strip()
 
-    api_key = os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID")
-    secret_key = os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY")
-
-    print("PRICE_LOOKUP_VERSION=IEX_CLIENT_CLEAN_COPY")
-    print(f"RAILWAY_KEY_LOADED={bool(api_key)} KEY_LEN={len(api_key) if api_key else 0} KEY_LAST4={api_key[-4:] if api_key else 'NONE'}")
-    print(f"RAILWAY_SECRET_LOADED={bool(secret_key)} SECRET_LEN={len(secret_key) if secret_key else 0} SECRET_LAST4={secret_key[-4:] if secret_key else 'NONE'}")
+    print("PRICE_LOOKUP_VERSION=RAW_IEX_REQUEST_CLEAN", flush=True)
+    print(
+        f"RAILWAY_KEY_LOADED={bool(api_key)} "
+        f"KEY_LEN={len(api_key) if api_key else 0} "
+        f"KEY_LAST4={api_key[-4:] if api_key else 'NONE'}",
+        flush=True,
+    )
+    print(
+        f"RAILWAY_SECRET_LOADED={bool(secret_key)} "
+        f"SECRET_LEN={len(secret_key) if secret_key else 0} "
+        f"SECRET_LAST4={secret_key[-4:] if secret_key else 'NONE'}",
+        flush=True,
+    )
 
     if not api_key or not secret_key:
         raise ValueError("Missing Alpaca API credentials for live price lookup")
 
     try:
-        print("PRICE_LOOKUP_VERSION=IEX_CLIENT_CLEAN_COPY")
+        url = "https://data.alpaca.markets/v2/stocks/trades/latest"
 
-        data_client = StockHistoricalDataClient(api_key, secret_key)
+        headers = {
+            "APCA-API-KEY-ID": api_key,
+            "APCA-API-SECRET-KEY": secret_key,
+        }
 
-        request = StockLatestTradeRequest(
-            symbol_or_symbols=symbol,
-            feed=DataFeed.IEX
-        )
+        params = {
+            "symbols": symbol,
+            "feed": "iex",
+        }
 
-        trades = data_client.get_stock_latest_trade(request)
-        trade = trades[symbol]
+        response = requests.get(url, headers=headers, params=params, timeout=10)
 
-        return float(trade.price)
+        if response.status_code != 200:
+            raise ValueError(f"Price lookup failed {response.status_code}: {response.text}")
+
+        data = response.json()
+
+        return float(data["trades"][symbol]["p"])
 
     except Exception as e:
         raise ValueError(f"Could not get live price for {symbol}: {e}")
 
-        trades = data_client.get_stock_latest_trade(request)
-        trade = trades[symbol]
-
-        return float(trade.price)
-
-    except Exception as e:
-        raise ValueError(f"Could not get live price for {symbol}: {e}")
 
 def ensure_log():
     if os.path.exists(LOG_FILE):
@@ -202,6 +210,7 @@ def calculate_qty(entry, stop_loss):
     qty = min(qty, MAX_SHARES_PER_TRADE)
     return qty
 
+
 def validate_payload(payload):
     secret = str(payload.get("secret", ""))
 
@@ -244,8 +253,6 @@ def validate_payload(payload):
 
 
 def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
-    # Re-check live price right before submitting.
-    # Use a wider safety buffer so Alpaca's market-order base_price does not reject the bracket.
     current_price = round(get_live_price(symbol), 2)
 
     stop_buffer = max(float(AUTO_STOP_DOLLARS), 10.00)
