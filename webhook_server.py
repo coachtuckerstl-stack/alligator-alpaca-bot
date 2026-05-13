@@ -346,6 +346,23 @@ def webhook():
         log_event(symbol, side_text, "", "", "", "", "REJECTED", reason, payload)
         return jsonify({"ok": False, "error": reason}), 400
 
+@app.get("/debug-env")
+def debug_env():
+    api_key = (os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY") or "").strip()
+    secret_key = (os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip()
+
+    return jsonify({
+        "apca_key_loaded": bool(os.getenv("APCA_API_KEY_ID")),
+        "alpaca_key_loaded": bool(os.getenv("ALPACA_API_KEY")),
+        "apca_secret_loaded": bool(os.getenv("APCA_API_SECRET_KEY")),
+        "alpaca_secret_loaded": bool(os.getenv("ALPACA_SECRET_KEY")),
+        "key_len": len(api_key),
+        "key_last4": api_key[-4:] if api_key else "NONE",
+        "secret_len": len(secret_key),
+        "secret_last4": secret_key[-4:] if secret_key else "NONE",
+        "paper": ALPACA_PAPER,
+    })
+
 
 if __name__ == "__main__":
     ensure_log()
