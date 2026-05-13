@@ -184,47 +184,23 @@ def calculate_qty(entry, stop_loss):
     return qty
 
 
-def validate_payload(payload):
-    secret = str(payload.get("secret", ""))
-
-    if secret != WEBHOOK_SECRET:
-        raise ValueError("Invalid webhook secret.")
-
-    symbol = str(payload.get("symbol", "")).upper().strip()
-
-    if symbol not in ALLOWED_SYMBOLS:
-        raise ValueError(f"Symbol not allowed: {symbol}")
-
-    side_text = str(payload.get("side", "")).lower().strip()
-    side = get_side(side_text)
-
-    if USE_LIVE_ENTRY_PRICE:
-        entry = round(get_live_price(symbol), 2)
-    else:
-        entry = get_float(payload, "entry")
-
-    if AUTO_BRACKET:
-        if side == OrderSide.BUY:
-            stop_loss = round(entry - AUTO_STOP_DOLLARS, 2)
-            take_profit = round(entry + AUTO_TARGET_DOLLARS, 2)
-        elif side == OrderSide.SELL:
-            stop_loss = round(entry + AUTO_STOP_DOLLARS, 2)
-            take_profit = round(entry - AUTO_TARGET_DOLLARS, 2)
-    else:
-        stop_loss = get_float(payload, "stop_loss")
-        take_profit = get_float(payload, "take_profit")
-
-    if side == OrderSide.BUY and not (stop_loss < entry < take_profit):
-        raise ValueError("Invalid buy setup. Need stop_loss < entry < take_profit.")
-
-    if side == OrderSide.SELL and not (take_profit < entry < stop_loss):
-        raise ValueError("Invalid sell setup. Need take_profit < entry < stop_loss.")
-
-    qty = calculate_qty(entry, stop_loss)
-
-    return symbol, side_text, side, entry, stop_loss, take_profit, qty
-
 def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
+    # Re-check live price right before submitting.
+    # This prevents Alpaca from rejecting bracket orders if price moved
+    # between signal validation and order submission.
+    current_price = round(get_live_price(symbol), 2)
+
+    if side == OrderSide.BUY:
+        stop_loss = min(float(stop_loss), current_price - 0.05)
+        take_profit = max(float(take_profit), current_price + 0.05)
+
+    elif side == OrderSide.SELL:
+        stop_loss = max(float(stop_loss), current_price + 0.05)
+        take_profit = min(float(take_profit), current_price - 0.05)
+
+    stop_loss = round(stop_loss, 2)
+    take_profit = round(take_profit, 2)
+
     order = MarketOrderRequest(
         symbol=symbol,
         qty=qty,
@@ -232,8 +208,8 @@ def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
         type=OrderType.MARKET,
         time_in_force=TimeInForce.DAY,
         order_class=OrderClass.BRACKET,
-        take_profit=TakeProfitRequest(limit_price=round(take_profit, 2)),
-        stop_loss=StopLossRequest(stop_price=round(stop_loss, 2)),
+        take_profit=TakeProfitRequest(limit_price=take_profit),
+        stop_loss=StopLossRequest(stop_price=stop_loss),
     )
 
     return trading_client.submit_order(order_data=order)
