@@ -13,8 +13,8 @@ from alpaca.trading.requests import MarketOrderRequest, TakeProfitRequest, StopL
 
 load_dotenv()
 
-ALPACA_API_KEY = (os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID") or "").strip()
-ALPACA_SECRET_KEY = (os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY") or "").strip()
+ALPACA_API_KEY = (os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY") or "").strip()
+ALPACA_SECRET_KEY = (os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip()
 ALPACA_PAPER = os.getenv("ALPACA_PAPER", "true").lower() == "true"
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "coachsq_secret_123")
@@ -58,8 +58,8 @@ def today():
 
 
 def get_live_price(symbol):
-    api_key = (os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID") or "").strip()
-    secret_key = (os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY") or "").strip()
+    api_key = (os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY") or "").strip()
+    secret_key = (os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip()
 
     print("PRICE_LOOKUP_VERSION=RAW_IEX_REQUEST_CLEAN", flush=True)
     print(
