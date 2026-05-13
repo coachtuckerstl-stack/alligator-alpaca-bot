@@ -61,20 +61,6 @@ def get_live_price(symbol):
     api_key = (os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY") or "").strip()
     secret_key = (os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip()
 
-    print("PRICE_LOOKUP_VERSION=RAW_IEX_REQUEST_CLEAN", flush=True)
-    print(
-        f"RAILWAY_KEY_LOADED={bool(api_key)} "
-        f"KEY_LEN={len(api_key) if api_key else 0} "
-        f"KEY_LAST4={api_key[-4:] if api_key else 'NONE'}",
-        flush=True,
-    )
-    print(
-        f"RAILWAY_SECRET_LOADED={bool(secret_key)} "
-        f"SECRET_LEN={len(secret_key) if secret_key else 0} "
-        f"SECRET_LAST4={secret_key[-4:] if secret_key else 'NONE'}",
-        flush=True,
-    )
-
     if not api_key or not secret_key:
         raise ValueError("Missing Alpaca API credentials for live price lookup")
 
@@ -345,24 +331,6 @@ def webhook():
         reason = str(e)
         log_event(symbol, side_text, "", "", "", "", "REJECTED", reason, payload)
         return jsonify({"ok": False, "error": reason}), 400
-
-@app.get("/debug-env")
-def debug_env():
-    api_key = (os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY") or "").strip()
-    secret_key = (os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip()
-
-    return jsonify({
-        "apca_key_loaded": bool(os.getenv("APCA_API_KEY_ID")),
-        "alpaca_key_loaded": bool(os.getenv("ALPACA_API_KEY")),
-        "apca_secret_loaded": bool(os.getenv("APCA_API_SECRET_KEY")),
-        "alpaca_secret_loaded": bool(os.getenv("ALPACA_SECRET_KEY")),
-        "key_len": len(api_key),
-        "key_last4": api_key[-4:] if api_key else "NONE",
-        "secret_len": len(secret_key),
-        "secret_last4": secret_key[-4:] if secret_key else "NONE",
-        "paper": ALPACA_PAPER,
-        "service_fingerprint": os.getenv("SERVICE_FINGERPRINT", "NOT_FOUND"),
-    })
 
 
 if __name__ == "__main__":
