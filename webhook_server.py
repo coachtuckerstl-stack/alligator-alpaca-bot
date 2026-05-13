@@ -59,17 +59,27 @@ def today():
     return now_et().strftime("%Y-%m-%d")
 
 def get_live_price(symbol):
+    import os
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockLatestTradeRequest
+    from alpaca.data.enums import DataFeed
+
+    api_key = os.getenv("ALPACA_API_KEY") or os.getenv("APCA_API_KEY_ID")
+    secret_key = os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY")
+
+    if not api_key or not secret_key:
+        raise ValueError("Missing Alpaca API credentials for live price lookup")
+
     try:
-        request_params = StockLatestTradeRequest(symbol_or_symbols=symbol)
-        latest_trade = data_client.get_stock_latest_trade(request_params)
+        data_client = StockHistoricalDataClient(api_key, secret_key)
 
-        if isinstance(latest_trade, dict):
-            trade = latest_trade.get(symbol)
-        else:
-            trade = latest_trade
+        request = StockLatestTradeRequest(
+            symbol_or_symbols=symbol,
+            feed=DataFeed.IEX
+        )
 
-        if trade is None:
-            raise ValueError(f"No latest trade found for {symbol}")
+        trades = data_client.get_stock_latest_trade(request)
+        trade = trades[symbol]
 
         return float(trade.price)
 
