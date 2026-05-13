@@ -361,6 +361,7 @@ def debug_env():
         "secret_len": len(secret_key),
         "secret_last4": secret_key[-4:] if secret_key else "NONE",
         "paper": ALPACA_PAPER,
+        "service_fingerprint": os.getenv("SERVICE_FINGERPRINT", "NOT_FOUND"),
     })
 
 
