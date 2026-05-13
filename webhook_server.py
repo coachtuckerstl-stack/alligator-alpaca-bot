@@ -46,10 +46,6 @@ trading_client = TradingClient(
     paper=ALPACA_PAPER,
 )
 
-data_client = StockHistoricalDataClient(
-    api_key=ALPACA_API_KEY,
-    secret_key=ALPACA_SECRET_KEY,
-)
 
 def now_et():
     return datetime.now(EASTERN)
@@ -71,6 +67,7 @@ def get_live_price(symbol):
         raise ValueError("Missing Alpaca API credentials for live price lookup")
 
     try:
+        print("PRICE_LOOKUP_VERSION=IEX_CLIENT_FIX")
         data_client = StockHistoricalDataClient(api_key, secret_key)
 
         request = StockLatestTradeRequest(
@@ -85,7 +82,6 @@ def get_live_price(symbol):
 
     except Exception as e:
         raise ValueError(f"Could not get live price for {symbol}: {e}")
-
 
 def ensure_log():
     if os.path.exists(LOG_FILE):
