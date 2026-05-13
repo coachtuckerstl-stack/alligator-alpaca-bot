@@ -226,17 +226,19 @@ def validate_payload(payload):
 
 def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
     # Re-check live price right before submitting.
-    # This prevents Alpaca from rejecting bracket orders if price moved
-    # between signal validation and order submission.
+    # Use a wider safety buffer so Alpaca's market-order base_price does not reject the bracket.
     current_price = round(get_live_price(symbol), 2)
 
+    stop_buffer = max(float(AUTO_STOP_DOLLARS), 3.00)
+    target_buffer = max(float(AUTO_TARGET_DOLLARS), 3.00)
+
     if side == OrderSide.BUY:
-        stop_loss = min(float(stop_loss), current_price - 0.05)
-        take_profit = max(float(take_profit), current_price + 0.05)
+        stop_loss = min(float(stop_loss), current_price - stop_buffer)
+        take_profit = max(float(take_profit), current_price + target_buffer)
 
     elif side == OrderSide.SELL:
-        stop_loss = max(float(stop_loss), current_price + 0.05)
-        take_profit = min(float(take_profit), current_price - 0.05)
+        stop_loss = max(float(stop_loss), current_price + stop_buffer)
+        take_profit = min(float(take_profit), current_price - target_buffer)
 
     stop_loss = round(stop_loss, 2)
     take_profit = round(take_profit, 2)
