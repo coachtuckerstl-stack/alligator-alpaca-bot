@@ -45,7 +45,7 @@ def health():
         "ok": True,
         "bot": "Alligator Bot - LIVE",
         "status": "online"
-    }, 200v
+    }, 200
 
 if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
     raise ValueError("Missing Alpaca API credentials at startup")
