@@ -39,6 +39,165 @@ EASTERN = ZoneInfo("America/New_York")
 
 app = Flask(__name__)
 
+# ==============================
+# Dashboard Database Logging
+# ==============================
+
+import json
+from urllib.parse import urlparse
+from sqlalchemy import create_engine, text
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+db_engine = create_engine(DATABASE_URL) if DATABASE_URL else None
+
+print(f"DATABASE_URL loaded: {'YES' if DATABASE_URL else 'NO'}", flush=True)
+print(f"Database engine ready: {'YES' if db_engine else 'NO'}", flush=True)
+
+
+def log_db_event(
+    event_type,
+    symbol=None,
+    side=None,
+    strategy=None,
+    model=None,
+    status=None,
+    qty=None,
+    entry=None,
+    stop_loss=None,
+    take_profit=None,
+    order_id=None,
+    message=None,
+    raw_payload=None,
+):
+    if db_engine is None:
+        print("Database log skipped: db_engine is None", flush=True)
+        return
+
+    try:
+        payload_text = None
+        if raw_payload is not None:
+            payload_text = json.dumps(raw_payload)
+
+        with db_engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO bot_events (
+                        bot_name,
+                        event_type,
+                        symbol,
+                        side,
+                        strategy,
+                        model,
+                        status,
+                        qty,
+                        entry,
+                        stop_loss,
+                        take_profit,
+                        order_id,
+                        message,
+                        raw_payload
+                    )
+                    VALUES (
+                        :bot_name,
+                        :event_type,
+                        :symbol,
+                        :side,
+                        :strategy,
+                        :model,
+                        :status,
+                        :qty,
+                        :entry,
+                        :stop_loss,
+                        :take_profit,
+                        :order_id,
+                        :message,
+                        :raw_payload
+                    )
+                """),
+                {
+                    "bot_name": "Alligator Bot - LIVE",
+                    "event_type": event_type,
+                    "symbol": symbol,
+                    "side": side,
+                    "strategy": strategy,
+                    "model": model,
+                    "status": status,
+                    "qty": qty,
+                    "entry": entry,
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "order_id": order_id,
+                    "message": message,
+                    "raw_payload": payload_text,
+                },
+            )
+    except Exception as e:
+        print(f"Database log failed: {e}", flush=True)
+
+
+@app.route("/db-test", methods=["GET"])
+def db_test():
+    if not DATABASE_URL:
+        return {
+            "ok": False,
+            "error": "DATABASE_URL is not loaded",
+            "database_url_loaded": False,
+        }, 500
+
+    try:
+        parsed = urlparse(DATABASE_URL)
+        db_host = parsed.hostname
+
+        if db_engine is None:
+            return {
+                "ok": False,
+                "error": "db_engine is None",
+                "database_url_loaded": True,
+                "db_host": db_host,
+            }, 500
+
+        with db_engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO bot_events (
+                        bot_name,
+                        event_type,
+                        symbol,
+                        side,
+                        strategy,
+                        model,
+                        status,
+                        message
+                    )
+                    VALUES (
+                        'Alligator Bot - LIVE',
+                        'DB_TEST',
+                        'AMD',
+                        'buy',
+                        'database_test',
+                        'alligator_railway_db_test',
+                        'SUCCESS',
+                        'Manual DB test inserted from Railway Alligator bot'
+                    )
+                """)
+            )
+
+        return {
+            "ok": True,
+            "database_url_loaded": True,
+            "db_host": db_host,
+            "message": "Alligator DB test insert successful",
+        }, 200
+
+    except Exception as e:
+        parsed = urlparse(DATABASE_URL)
+        return {
+            "ok": False,
+            "database_url_loaded": True,
+            "db_host": parsed.hostname,
+            "error": str(e),
+        }, 500
+
 @app.route("/health", methods=["GET"])
 def health():
     return {
