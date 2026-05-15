@@ -10,6 +10,8 @@ from flask import Flask, jsonify, request
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderClass, OrderSide, OrderType, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest, TakeProfitRequest, StopLossRequest
+from trade_logger import log_trade_event
+from trade_logger import log_trade_event
 
 load_dotenv()
 
@@ -452,7 +454,31 @@ def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
         stop_loss=StopLossRequest(stop_price=stop_loss),
     )
 
-    return trading_client.submit_order(order_data=order)
+    submitted_order = trading_client.submit_order(order_data=order)
+
+    log_trade_event(
+        bot_group="ALLIGATOR",
+        strategy="alligator_trend_v1",
+        model="alligator_live_v1",
+        symbol=symbol,
+        side=str(side),
+        qty=qty,
+        entry_price=current_price,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        status="ORDER_SUBMITTED",
+        order_id=getattr(submitted_order, "id", ""),
+        raw_payload={
+            "symbol": symbol,
+            "side": str(side),
+            "qty": qty,
+            "current_price": current_price,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+        },
+    )
+
+    return submitted_order
 
 
 @app.get("/")
@@ -504,6 +530,20 @@ def webhook():
 
         if not time_ok:
             log_event(symbol, side_text, entry, stop_loss, take_profit, qty, "REJECTED", time_reason, payload)
+            log_trade_event(
+                bot_group="ALLIGATOR",
+                strategy="alligator_trend_v1",
+                model="alligator_live_v1",
+                symbol=symbol,
+                side=side_text,
+                qty=qty,
+                entry_price=entry,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                status="REJECTED",
+                reason=time_reason,
+                raw_payload=payload,
+            )
 
             log_db_event(
                 event_type="TRADE_REJECTED",
