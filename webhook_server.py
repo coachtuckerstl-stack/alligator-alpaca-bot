@@ -44,7 +44,8 @@ EASTERN = ZoneInfo("America/New_York")
 # ==============================
 
 ALLOW_NEW_TRADES_AFTER = time(9, 45)
-STOP_NEW_TRADES_AFTER = time(15, 30)
+STOP_NEW_TRADES_AFTER = time(15, 0)
+ALLOW_OVERNIGHT_HOLDS = True
 
 def trading_time_allowed():
     now = datetime.now(EASTERN).time()
@@ -53,7 +54,7 @@ def trading_time_allowed():
         return False, "Trading blocked — before 9:45 AM ET"
 
     if now >= STOP_NEW_TRADES_AFTER:
-        return False, "Trading blocked — after 3:30 PM ET"
+        return False, "Trading blocked — after 3:00 PM ET"
 
     return True, "Trading window approved"
 
