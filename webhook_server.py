@@ -31,7 +31,7 @@ MAX_TRADES_PER_SYMBOL_PER_DAY = int(os.getenv("BOT_MAX_TRADES_PER_SYMBOL_PER_DAY
 RISK_DOLLARS_PER_TRADE = float(os.getenv("BOT_RISK_DOLLARS_PER_TRADE", "2"))
 MAX_SHARES_PER_TRADE = int(os.getenv("BOT_MAX_SHARES_PER_TRADE", "5"))
 USE_LIVE_ENTRY_PRICE = os.getenv("BOT_USE_LIVE_ENTRY_PRICE", "true").lower() == "true"
-AUTO_BRACKET = os.getenv("BOT_AUTO_BRACKET", "true").lower() == "true"
+AUTO_BRACKET = os.getenv("BOT_AUTO_BRACKET", "false").lower() == "true"
 AUTO_STOP_DOLLARS = float(os.getenv("BOT_AUTO_STOP_DOLLARS", "1.50"))
 AUTO_TARGET_DOLLARS = float(os.getenv("BOT_AUTO_TARGET_DOLLARS", "3.00"))
 
@@ -398,23 +398,15 @@ def get_side(side_text):
     raise ValueError(f"Invalid side: {side_text}")
 
 
-def calculate_qty(entry, stop_loss):
-    risk_per_share = abs(entry - stop_loss)
-
-    if risk_per_share <= 0:
-        raise ValueError("Invalid risk per share.")
-
-    qty = int(RISK_DOLLARS_PER_TRADE // risk_per_share)
-
-    if qty < 1:
-        raise ValueError(
-            f"Risk per share ${risk_per_share:.2f} is too high for "
-            f"${RISK_DOLLARS_PER_TRADE:.2f} risk."
-        )
-
-    qty = min(qty, MAX_SHARES_PER_TRADE)
-    return qty
-
+def calculate_qty(entry, stop_loss=None):
+    """Use fixed $20 notional fractional size for apples-to-apples paper testing."""
+    try:
+        entry = float(entry)
+        if entry <= 0:
+            return 0
+        return round(MAX_DOLLARS_PER_TRADE / entry, 6)
+    except Exception:
+        return 0
 
 def validate_payload(payload):
     secret = str(payload.get("secret", ""))
@@ -462,59 +454,15 @@ def validate_payload(payload):
 
 
 def submit_bracket_order(symbol, side, qty, stop_loss, take_profit):
-    current_price = round(get_live_price(symbol), 2)
-
-    stop_buffer = float(AUTO_STOP_DOLLARS)
-    target_buffer = float(AUTO_TARGET_DOLLARS)
-
-    if side == OrderSide.BUY:
-        stop_loss = min(float(stop_loss), current_price - stop_buffer)
-        take_profit = max(float(take_profit), current_price + target_buffer)
-
-    elif side == OrderSide.SELL:
-        stop_loss = max(float(stop_loss), current_price + stop_buffer)
-        take_profit = min(float(take_profit), current_price - target_buffer)
-
-    stop_loss = round(stop_loss, 2)
-    take_profit = round(take_profit, 2)
-
+    """Submit simple fractional market order. Stop/target are logged for bot-managed exits later."""
     order = MarketOrderRequest(
         symbol=symbol,
         qty=qty,
         side=side,
-        type=OrderType.MARKET,
-        time_in_force=TimeInForce.DAY,
-        order_class=OrderClass.BRACKET,
-        take_profit=TakeProfitRequest(limit_price=take_profit),
-        stop_loss=StopLossRequest(stop_price=stop_loss),
+        time_in_force=TimeInForce.DAY
     )
-
     submitted_order = trading_client.submit_order(order_data=order)
-
-    log_trade_event(
-        bot_group="ALLIGATOR",
-        strategy="alligator_trend_v1",
-        model="alligator_live_v1",
-        symbol=symbol,
-        side=str(side),
-        qty=qty,
-        entry_price=current_price,
-        stop_loss=stop_loss,
-        take_profit=take_profit,
-        status="ORDER_SUBMITTED",
-        order_id=getattr(submitted_order, "id", ""),
-        raw_payload={
-            "symbol": symbol,
-            "side": str(side),
-            "qty": qty,
-            "current_price": current_price,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-        },
-    )
-
     return submitted_order
-
 
 @app.get("/")
 def home():
@@ -718,3 +666,14 @@ def webhook():
 if __name__ == "__main__":
     ensure_log()
     app.run(host="0.0.0.0", port=5003, debug=False)
+
+
+def calculate_fractional_qty(entry_price):
+    """Return fractional share qty for fixed $20 notional paper testing."""
+    try:
+        entry_price = float(entry_price)
+        if entry_price <= 0:
+            return 0
+        return round(MAX_DOLLARS_PER_TRADE / entry_price, 6)
+    except Exception:
+        return 0
