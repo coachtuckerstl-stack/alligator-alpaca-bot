@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import os
 import requests
 from datetime import datetime, time
@@ -50,10 +50,10 @@ def trading_time_allowed():
     now = datetime.now(EASTERN).time()
 
     if now < ALLOW_NEW_TRADES_AFTER:
-        return False, "Trading blocked — before 9:45 AM ET"
+        return False, "Trading blocked â€” before 9:45 AM ET"
 
     if now >= STOP_NEW_TRADES_AFTER:
-        return False, "Trading blocked — after 3:00 PM ET"
+        return False, "Trading blocked â€” after 3:00 PM ET"
 
     return True, "Trading window approved"
 
@@ -677,3 +677,42 @@ def calculate_fractional_qty(entry_price):
         return round(MAX_DOLLARS_PER_TRADE / entry_price, 6)
     except Exception:
         return 0
+
+# ===== COACH_T_AUTO_HEARTBEAT_START =====
+# Auto health logging for Coach T Command Center v2.
+# Keeps webhook-only bots visible in /api/health even when no TradingView alerts arrive.
+import threading as _coach_t_threading
+import time as _coach_t_time
+
+def _coach_t_health_loop():
+    try:
+        log_db_event(
+            event_type="BOT_STARTED",
+            status="STARTED",
+            message="Coach T Command Center v2 startup heartbeat"
+        )
+    except Exception as exc:
+        print(f"Coach T startup heartbeat failed: {exc}", flush=True)
+
+    while True:
+        try:
+            log_db_event(
+                event_type="HEARTBEAT",
+                status="RUNNING",
+                message="Coach T Command Center v2 automatic heartbeat"
+            )
+        except Exception as exc:
+            print(f"Coach T automatic heartbeat failed: {exc}", flush=True)
+
+        _coach_t_time.sleep(600)
+
+try:
+    _coach_t_threading.Thread(
+        target=_coach_t_health_loop,
+        daemon=True,
+        name="coach-t-health-heartbeat"
+    ).start()
+except Exception as exc:
+    print(f"Coach T heartbeat thread failed to start: {exc}", flush=True)
+# ===== COACH_T_AUTO_HEARTBEAT_END =====
+
